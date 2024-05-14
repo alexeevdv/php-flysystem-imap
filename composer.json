@@ -1,0 +1,30 @@
+{
+    "name": "alexeevdv/flysystem-imap",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Dmitry V. Alekseev",
+            "email": "mail@alexeevdv.ru"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "alexeevdv\\Flysystem\\Imap\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\Unit\\": "tests\\unit"
+        }
+    },
+    "require": {
+        "ext-imap": "*",
+        "league/flysystem": "^3.0"
+    },
+    "require-dev": {
+        "codeception/codeception": "^5.1",
+        "codeception/module-asserts": "*",
+        "symplify/easy-coding-standard": "^12.1"
+    }
+}
