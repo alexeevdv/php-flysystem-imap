@@ -2,8 +2,6 @@
 
 namespace alexeevdv\Flysystem\Imap;
 
-use http\Exception\RuntimeException;
-
 final class ImapConnection implements Connection
 {
     private const CONTENT_SECTION = 1;
@@ -54,12 +52,12 @@ final class ImapConnection implements Connection
     {
         $result = imap_fetchbody($this->imap, $uid, self::CONTENT_SECTION, FT_UID);
         if ($result === false) {
-            throw new RuntimeException('imap_fetchbody');
+            throw new \RuntimeException('imap_fetchbody');
         }
 
         $result = imap_base64($result);
         if ($result === false) {
-            throw new RuntimeException('imap_base64');
+            throw new \RuntimeException('imap_base64');
         }
 
         return $result;

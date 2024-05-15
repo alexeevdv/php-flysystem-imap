@@ -4,6 +4,8 @@ namespace alexeevdv\Flysystem\Imap;
 
 final class EncryptionConnectionDecorator implements Connection
 {
+    private const int STREAM_READ_BUFFER_SIZE = 8192;
+
     private const CYPHER_ALGO = 'AES-128-CTR';
 
     private Connection $inner;
@@ -29,8 +31,26 @@ final class EncryptionConnectionDecorator implements Connection
 
     public function readResource(string $uid)
     {
-        // TODO read file, decrypt, create new file, delete old file
-        return $this->inner->readResource($uid);
+        // TODO stream filter
+        // @see https://github.com/jeskew/php-encrypted-streams/blob/master/src/AesDecryptingStream.php
+
+        $fd = $this->inner->readResource($uid);
+
+        $encryptedContent = '';
+        while(($chunk = fread($fd, self::STREAM_READ_BUFFER_SIZE)) !== false && !feof($fd)) {
+            $encryptedContent .= $chunk;
+        }
+        fclose($fd);
+
+        $tmpFile = tempnam(sys_get_temp_dir(), '');
+        file_put_contents($tmpFile, $this->decrypt($encryptedContent));
+
+        $fd = fopen($tmpFile, 'rb+');
+        if ($fd === false) {
+            throw new \RuntimeException('Cant open file');
+        }
+
+        return $fd;
     }
 
     public function read(string $uid): string
