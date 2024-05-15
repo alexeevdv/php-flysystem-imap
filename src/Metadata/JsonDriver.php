@@ -63,6 +63,7 @@ final class JsonDriver implements Driver
             children: array_map([$this, 'unmapItem'], $item['children'] ?? []),
             uid: $item['uid'] ?? null,
             fileSize: $item['fileSize'] ?? null,
+            visibility: $item['visibility'] ?? null,
         );
     }
 
@@ -74,6 +75,7 @@ final class JsonDriver implements Driver
             'children' => array_map([$this, 'mapItem'], $item->getChildren()),
             'uid' => $item->getUid(),
             'fileSize' => $item->getFileSize(),
+            'visibility' => $item->getVisibility(),
         ];
     }
 }

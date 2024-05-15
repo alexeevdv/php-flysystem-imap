@@ -315,7 +315,7 @@ final class ImapAdapterTest extends Unit
         $this->imapAdapter->delete('file1');
     }
 
-    public function testDeletePath(): void
+    public function testDeleteHappyPath(): void
     {
         $file1 = Item::file('file1');
         $file1->setUid('123');
@@ -324,15 +324,6 @@ final class ImapAdapterTest extends Unit
         $this->connection->method('readResource')
             ->with('123')
             ->willReturn(tmpfile())
-        ;
-
-        $this->connection->expects($this->once())->method('getUid')
-            ->with('metadata')
-            ->willReturn(null)
-        ;
-
-        $this->connection->expects($this->once())->method('write')
-            ->with('metadata', $this->anything())
         ;
 
         $this->imapAdapter->delete('file1');

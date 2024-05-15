@@ -10,6 +10,7 @@ use League\Flysystem\UnableToCreateDirectory;
 use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToSetVisibility;
 use League\Flysystem\UnableToWriteFile;
 use LogicException;
 use RuntimeException;
@@ -25,6 +26,8 @@ class ImapAdapter implements FilesystemAdapter
 
     private string $pathToMetadata;
 
+    private ?string $lastMetaHash = null;
+
     public function __construct(
         Metadata\Driver $metadataDriver,
         Connection $connection,
@@ -38,6 +41,14 @@ class ImapAdapter implements FilesystemAdapter
         if ($uid !== null) {
             $metadata = $this->connection->read($uid);
             $this->metadataDriver->fromString($metadata);
+            $this->lastMetaHash = $this->getMetaHash();
+        }
+    }
+
+    public function __destruct()
+    {
+        if ($this->lastMetaHash !== $this->getMetaHash()) {
+            $this->writeMeta();
         }
     }
 
@@ -71,8 +82,6 @@ class ImapAdapter implements FilesystemAdapter
         } catch (Throwable $e) {
             throw UnableToWriteFile::atLocation($path, $e->getMessage(), $e);
         }
-
-        $this->writeMeta();
     }
 
     public function writeStream(string $path, $contents, Config $config): void
@@ -115,8 +124,6 @@ class ImapAdapter implements FilesystemAdapter
         } catch (Throwable $e) {
             throw UnableToDeleteFile::atLocation($path, $e->getMessage(), $e);
         }
-
-        $this->writeMeta();
     }
 
     public function deleteDirectory(string $path): void
@@ -147,7 +154,12 @@ class ImapAdapter implements FilesystemAdapter
 
     public function setVisibility(string $path, string $visibility): void
     {
-        // TODO: Implement setVisibility() method.
+        $item = $this->getItem($path);
+        if ($item === null) {
+            throw UnableToSetVisibility::atLocation($path, 'Item not found');
+        }
+
+        $item->setVisibility($visibility);
     }
 
     public function visibility(string $path): FileAttributes
@@ -172,7 +184,7 @@ class ImapAdapter implements FilesystemAdapter
 
     public function listContents(string $path, bool $deep): iterable
     {
-        // TODO: Implement listContents() method.
+        yield;
     }
 
     public function move(string $source, string $destination, Config $config): void
@@ -201,7 +213,7 @@ class ImapAdapter implements FilesystemAdapter
         return new FileAttributes(
             path: $this->metadataDriver->getItemPath($item),
             fileSize: $item->getFileSize(),
-            visibility: null,
+            visibility: $item->getVisibility(),
             lastModified: null,
             mimeType: null,
             extraMetadata: [],
@@ -345,5 +357,10 @@ class ImapAdapter implements FilesystemAdapter
         }
 
         return $item;
+    }
+
+    private function getMetaHash(): string
+    {
+        return md5($this->metadataDriver->toString());
     }
 }

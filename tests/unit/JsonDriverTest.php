@@ -16,7 +16,8 @@ final class JsonDriverTest extends Unit
             "isDirectory": true,
             "children": [],
             "uid": null,
-            "fileSize": null
+            "fileSize": null,
+            "visibility": null
           }
         ]
         JSON;

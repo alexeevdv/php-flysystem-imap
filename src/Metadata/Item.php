@@ -17,6 +17,8 @@ class Item
 
     private ?int $fileSize;
 
+    private ?string $visibility;
+
     /**
      * @param Item[] $children
      */
@@ -24,14 +26,16 @@ class Item
         string $name,
         bool $isDirectory,
         array $children,
-        ?string $uid,
-        ?int $fileSize,
+        ?string $uid = null,
+        ?int $fileSize = null,
+        ?string $visibility = null,
     ) {
         $this->name = $name;
         $this->isDirectory = $isDirectory;
         $this->children = $children;
         $this->uid = $uid;
         $this->fileSize = $fileSize;
+        $this->visibility = $visibility;
     }
 
     /**
@@ -43,8 +47,6 @@ class Item
             name: $name,
             isDirectory: true,
             children: $children,
-            uid: null,
-            fileSize: null,
         );
     }
 
@@ -54,8 +56,6 @@ class Item
             name: $name,
             isDirectory: false,
             children: [],
-            uid: null,
-            fileSize: null,
         );
     }
 
@@ -111,5 +111,15 @@ class Item
     public function setFileSize(int $fileSize): void
     {
         $this->fileSize = $fileSize;
+    }
+
+    public function setVisibility(string $visibility): void
+    {
+        $this->visibility = $visibility;
+    }
+
+    public function getVisibility(): ?string
+    {
+        return $this->visibility;
     }
 }
