@@ -33,7 +33,7 @@ final class ImapConnection implements Connection
     public function readResource(string $uid)
     {
         $tmpFile = tempnam(sys_get_temp_dir(), '');
-        $result = imap_savebody($this->imap, $tmpFile, $uid, self::CONTENT_SECTION, FT_UID|FT_INTERNAL|FT_PEEK);
+        $result = imap_savebody($this->imap, $tmpFile, $uid, self::CONTENT_SECTION, FT_UID | FT_INTERNAL | FT_PEEK);
         if ($result === false) {
             throw new \RuntimeException('Could not save body to temporary file');
         }
@@ -43,7 +43,7 @@ final class ImapConnection implements Connection
             throw new \RuntimeException('Cant open file');
         }
 
-        stream_filter_append($fd, 'convert.base64-decode',STREAM_FILTER_READ);
+        stream_filter_append($fd, 'convert.base64-decode', STREAM_FILTER_READ);
 
         return $fd;
     }
@@ -101,8 +101,11 @@ final class ImapConnection implements Connection
         return (string) reset($uids);
     }
 
-    public function delete(string $uid): bool
+    public function delete(string $uid): void
     {
-        return imap_delete($this->imap, $uid, FT_UID);
+        $result = imap_delete($this->imap, $uid, FT_UID);
+        if ($result === false) {
+            throw new \RuntimeException('Can not delete message with uid: ' . $uid);
+        }
     }
 }

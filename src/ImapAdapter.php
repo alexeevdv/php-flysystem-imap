@@ -7,6 +7,10 @@ use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
 use League\Flysystem\UnableToDeleteFile;
+use League\Flysystem\UnableToReadFile;
+use LogicException;
+use RuntimeException;
+use Throwable;
 
 class ImapAdapter implements FilesystemAdapter
 {
@@ -28,12 +32,10 @@ class ImapAdapter implements FilesystemAdapter
         $this->pathToMetadata = $pathToMetadata;
 
         $uid = $this->connection->getUid($this->pathToMetadata);
-        if ($uid === null) {
-            $metadata = '[]';
-        } else {
+        if ($uid !== null) {
             $metadata = $this->connection->read($uid);
+            $this->metadataDriver->fromString($metadata);
         }
-        $this->metadataDriver->fromString($metadata);
     }
 
     public function fileExists(string $path): bool
@@ -67,12 +69,12 @@ class ImapAdapter implements FilesystemAdapter
             throw new \RuntimeException('null subject');
         }
 
-        if (!$this->connection->write($subject, $contents)) {
+        if ($this->connection->write($subject, $contents) === false) {
             throw new \RuntimeException('Cant write file contents');
         }
 
         $uid = $this->connection->getUid($subject);
-        if (!$uid === null) {
+        if ($uid === null) {
             throw new \RuntimeException('Cant find uid for subject');
         }
 
@@ -84,7 +86,7 @@ class ImapAdapter implements FilesystemAdapter
     public function writeStream(string $path, $contents, Config $config): void
     {
         $content = '';
-        while(($chunk = fread($contents, self::STREAM_READ_BUFFER_SIZE)) !== false && !feof($contents)) {
+        while(($chunk = fread($contents, self::STREAM_READ_BUFFER_SIZE)) !== false && feof($contents) !== true) {
             $content .= $chunk;
         }
 
@@ -93,57 +95,31 @@ class ImapAdapter implements FilesystemAdapter
 
     public function read(string $path): string
     {
-        $item = $this->getItem($path);
-        if ($item === null) {
-            throw new \RuntimeException('Cant find item to read');
+        try {
+            $item = $this->getFile($path);
+            return $this->connection->read($item->getUid());
+        } catch (Throwable $e) {
+            throw UnableToReadFile::fromLocation($path, $e->getMessage(), $e);
         }
-
-        if ($item->isDirectory()) {
-            throw new \RuntimeException('Cant read directory');
-        }
-
-        if ($item->getUid() === null) {
-            throw new \RuntimeException('Item has no uid');
-        }
-
-        return $this->connection->read($item->getUid());
     }
 
     public function readStream(string $path)
     {
-        $item = $this->getItem($path);
-        if ($item === null) {
-            throw new \RuntimeException('file not found');
+        try {
+            $item = $this->getFile($path);
+            return $this->connection->readResource($item->getUid());
+        } catch (Throwable $e) {
+            throw UnableToReadFile::fromLocation($path, $e->getMessage(), $e);
         }
-
-        if ($item->isDirectory()) {
-            throw new \RuntimeException('item is directory');
-        }
-
-        if ($item->getUid() === null) {
-            throw new \RuntimeException('item has no uid');
-        }
-
-        return $this->connection->readResource($item->getUid());
     }
 
     public function delete(string $path): void
     {
-        $item = $this->getItem($path);
-        if ($item === null) {
-            throw new UnableToDeleteFile('File does not exist');
-        }
-
-        if ($item->isDirectory()) {
-            throw new UnableToDeleteFile('Can not delete directory as file');
-        }
-
-        if ($item->getUid() === null) {
-            throw new \RuntimeException('Item has no uid');
-        }
-
-        if (!$this->connection->delete($item->getUid())) {
-            // TODO throw exception
+        try {
+            $item = $this->getFile($path);
+            $this->connection->delete($item->getUid());
+        } catch (Throwable $e) {
+            throw UnableToDeleteFile::atLocation($path, $e->getMessage(), $e);
         }
 
         $this->writeMeta();
@@ -191,6 +167,7 @@ class ImapAdapter implements FilesystemAdapter
 
     public function move(string $source, string $destination, Config $config): void
     {
+        // TODO just change metadata
         $this->copy($source, $destination, $config);
         $this->delete($source);
     }
@@ -281,5 +258,24 @@ class ImapAdapter implements FilesystemAdapter
         }
 
         $this->connection->write($this->pathToMetadata, $this->metadataDriver->toString());
+    }
+
+    private function getFile(string $path): Item
+    {
+        $item = $this->getItem($path);
+
+        if ($item === null) {
+            throw new RuntimeException('File does not exist');
+        }
+
+        if ($item->isDirectory()) {
+            throw new RuntimeException('Trying to read directory');
+        }
+
+        if ($item->getUid() === null) {
+            throw new LogicException('Metadata item has no uid');
+        }
+
+        return $item;
     }
 }

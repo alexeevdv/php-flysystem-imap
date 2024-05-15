@@ -1,9 +1,18 @@
-composer-install:
-	docker run -v .:/app -t composer:2.7.6 composer --ignore-platform-req=ext-imap install
-composer-update:
-	docker run -v .:/app -t composer:2.7.6 composer --ignore-platform-req=ext-imap update
-lint:
-	docker run -v .:/app -w /app -t php:8.3-cli php vendor/bin/ecs
-test:
-	docker run -v .:/app -w /app -t php:8.3-cli php vendor/bin/codecept build
-	docker run -v .:/app -w /app -t php:8.3-cli php vendor/bin/codecept run unit
+docker_php_tagname := php-cli-xdebug
+docker_php_run := docker run -v .:/app -t $(docker_php_tagname)
+
+build-php:
+	docker build -t $(docker_php_tagname) -f docker/php/Dockerfile .
+
+composer-install: build-php
+	$(docker_php_run) composer install
+
+composer-update: build-php
+	$(docker_php_run) composer update
+
+lint: build-php composer-install
+	$(docker_php_run) php vendor/bin/ecs
+
+test: build-php composer-install
+	$(docker_php_run) php vendor/bin/codecept build
+	$(docker_php_run) php vendor/bin/codecept run unit --coverage --coverage-html

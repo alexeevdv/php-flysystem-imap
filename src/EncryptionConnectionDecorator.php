@@ -37,7 +37,7 @@ final class EncryptionConnectionDecorator implements Connection
         $fd = $this->inner->readResource($uid);
 
         $encryptedContent = '';
-        while(($chunk = fread($fd, self::STREAM_READ_BUFFER_SIZE)) !== false && !feof($fd)) {
+        while(($chunk = fread($fd, self::STREAM_READ_BUFFER_SIZE)) !== false && feof($fd) !== true) {
             $encryptedContent .= $chunk;
         }
         fclose($fd);
@@ -63,9 +63,9 @@ final class EncryptionConnectionDecorator implements Connection
         return $this->inner->write($this->encrypt($subject), $this->encrypt($contents));
     }
 
-    public function delete(string $uid): bool
+    public function delete(string $uid): void
     {
-        return $this->inner->delete($uid);
+        $this->inner->delete($uid);
     }
 
     public function encrypt(string $value): string

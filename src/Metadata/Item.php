@@ -21,13 +21,12 @@ class Item
      * @param Item[] $children
      */
     public function __construct(
-        string  $name,
-        bool    $isDirectory,
-        array   $children,
+        string $name,
+        bool $isDirectory,
+        array $children,
         ?string $uid,
-        ?int    $fileSize,
-    )
-    {
+        ?int $fileSize,
+    ) {
         $this->name = $name;
         $this->isDirectory = $isDirectory;
         $this->children = $children;

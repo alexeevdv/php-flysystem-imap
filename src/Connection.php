@@ -15,5 +15,5 @@ interface Connection
 
     public function write(string $subject, string $contents): bool;
 
-    public function delete(string $uid): bool;
+    public function delete(string $uid): void;
 }
