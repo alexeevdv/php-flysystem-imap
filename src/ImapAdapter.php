@@ -10,6 +10,8 @@ use League\Flysystem\UnableToDeleteFile;
 
 class ImapAdapter implements FilesystemAdapter
 {
+    private const int STREAM_READ_BUFFER_SIZE = 8192;
+
     private Metadata\Driver $metadataDriver;
 
     private Connection $connection;
@@ -82,7 +84,7 @@ class ImapAdapter implements FilesystemAdapter
     public function writeStream(string $path, $contents, Config $config): void
     {
         $content = '';
-        while($chunk = fread($contents, 1024) !== false) {
+        while(($chunk = fread($contents, self::STREAM_READ_BUFFER_SIZE)) !== false && !feof($contents)) {
             $content .= $chunk;
         }
 
