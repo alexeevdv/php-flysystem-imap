@@ -34,13 +34,20 @@ final class ImapConnection implements Connection
 
     public function readResource(string $uid)
     {
-        $tmpFile = tmpfile();
-        $result = imap_savebody($this->imap, $tmpFile, $uid, self::CONTENT_SECTION, FT_UID);
+        $tmpFile = tempnam(sys_get_temp_dir(), '');
+        $result = imap_savebody($this->imap, $tmpFile, $uid, self::CONTENT_SECTION, FT_UID|FT_INTERNAL|FT_PEEK);
         if ($result === false) {
             throw new \RuntimeException('Could not save body to temporary file');
         }
 
-        return $tmpFile;
+        $fd = fopen($tmpFile, 'rb+');
+        if ($fd === false) {
+            throw new \RuntimeException('Cant open file');
+        }
+
+        stream_filter_append($fd, 'convert.base64-decode',STREAM_FILTER_READ);
+
+        return $fd;
     }
 
     public function read(string $uid): string
