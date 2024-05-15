@@ -6,8 +6,11 @@ use alexeevdv\Flysystem\Imap\Metadata\Item;
 use League\Flysystem\Config;
 use League\Flysystem\FileAttributes;
 use League\Flysystem\FilesystemAdapter;
+use League\Flysystem\UnableToCreateDirectory;
+use League\Flysystem\UnableToDeleteDirectory;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToWriteFile;
 use LogicException;
 use RuntimeException;
 use Throwable;
@@ -47,38 +50,27 @@ class ImapAdapter implements FilesystemAdapter
 
     public function write(string $path, string $contents, Config $config): void
     {
-        $item = $this->getItem($path);
-        if ($item !== null) {
-            if ($item->isDirectory()) {
-                throw new \RuntimeException('Cant write to directory');
+        try {
+            $item = $this->getNullableFile($path);
+            if ($item !== null) {
+                $this->connection->delete($item->getUid());
             }
 
-            if ($item->getUid() === null) {
-                throw new \LogicException('Item has no uid');
+            $item = $this->ensureFile($path);
+            $item->setFileSize(strlen($contents));
+
+            $subject = $this->metadataDriver->getItemPath($item);
+            $this->connection->write($subject, $contents);
+
+            $uid = $this->connection->getUid($subject);
+            if ($uid === null) {
+                throw new RuntimeException('Cant find uid for subject: ' . $subject);
             }
 
-            $this->connection->delete($item->getUid());
+            $item->setUid($uid);
+        } catch (Throwable $e) {
+            throw UnableToWriteFile::atLocation($path, $e->getMessage(), $e);
         }
-
-        $item = $this->ensureFile($path);
-
-        $item->setFileSize(strlen($contents));
-
-        $subject = $this->metadataDriver->getItemPath($item);
-        if ($subject === null) {
-            throw new \RuntimeException('null subject');
-        }
-
-        if ($this->connection->write($subject, $contents) === false) {
-            throw new \RuntimeException('Cant write file contents');
-        }
-
-        $uid = $this->connection->getUid($subject);
-        if ($uid === null) {
-            throw new \RuntimeException('Cant find uid for subject');
-        }
-
-        $item->setUid($uid);
 
         $this->writeMeta();
     }
@@ -118,6 +110,8 @@ class ImapAdapter implements FilesystemAdapter
         try {
             $item = $this->getFile($path);
             $this->connection->delete($item->getUid());
+
+            // TODO delete item from metadata tree
         } catch (Throwable $e) {
             throw UnableToDeleteFile::atLocation($path, $e->getMessage(), $e);
         }
@@ -127,12 +121,28 @@ class ImapAdapter implements FilesystemAdapter
 
     public function deleteDirectory(string $path): void
     {
-        // TODO: Implement deleteDirectory() method.
+        try {
+            $item = $this->getDirectory($path);
+
+            // TODO delete all nested items
+            // TODO delete item from metadata tree
+        } catch (Throwable $e) {
+            throw UnableToDeleteDirectory::atLocation($path, $e->getMessage(), $e);
+        }
     }
 
     public function createDirectory(string $path, Config $config): void
     {
-        // TODO check if directory exists
+        try {
+            $item = $this->getNullableDirectory($path);
+            if ($item !== null) {
+                throw new RuntimeException('Directory already exists');
+            }
+
+            // TODO add item to metadata tree
+        } catch (Throwable $e) {
+            throw UnableToCreateDirectory::atLocation($path, $e->getMessage(), $e);
+        }
     }
 
     public function setVisibility(string $path, string $visibility): void
@@ -260,18 +270,76 @@ class ImapAdapter implements FilesystemAdapter
         $this->connection->write($this->pathToMetadata, $this->metadataDriver->toString());
     }
 
-    private function getFile(string $path): Item
+    private function getNullableFile(string $path): ?Item
     {
         $item = $this->getItem($path);
-
         if ($item === null) {
-            throw new RuntimeException('File does not exist');
+            return null;
         }
 
-        if ($item->isDirectory()) {
-            throw new RuntimeException('Trying to read directory');
+        $item = $this->validateItemIsFile($item);
+        $item = $this->validateItemHasUid($item);
+
+        return $item;
+    }
+
+    private function getFile(string $path): Item
+    {
+        $item = $this->getNullableFile($path);
+        $item = $this->validateItemExists($item);
+
+        return $item;
+    }
+
+    private function getNullableDirectory(string $path): ?Item
+    {
+        $item = $this->getItem($path);
+        if ($item === null) {
+            return null;
         }
 
+        $item = $this->validateItemIsDirectory($item);
+
+        return $item;
+    }
+
+    private function getDirectory(string $path): Item
+    {
+        $item = $this->getNullableDirectory($path);
+        $item = $this->validateItemExists($item);
+
+        return $item;
+    }
+
+    private function validateItemExists(?Item $item): Item
+    {
+        if ($item === null) {
+            throw new RuntimeException('Metadata item does not exist');
+        }
+
+        return $item;
+    }
+
+    private function validateItemIsFile(Item $item): Item
+    {
+        if ($item->isDirectory() === true) {
+            throw new RuntimeException('Metadata item is not a file');
+        }
+
+        return $item;
+    }
+
+    private function validateItemIsDirectory(Item $item): Item
+    {
+        if ($item->isDirectory() === false) {
+            throw new RuntimeException('Metadata item is not a directory');
+        }
+
+        return $item;
+    }
+
+    private function validateItemHasUid(Item $item): Item
+    {
         if ($item->getUid() === null) {
             throw new LogicException('Metadata item has no uid');
         }

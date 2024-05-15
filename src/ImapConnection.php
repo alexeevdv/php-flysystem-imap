@@ -63,7 +63,7 @@ final class ImapConnection implements Connection
         return $result;
     }
 
-    public function write(string $subject, string $contents): bool
+    public function write(string $subject, string $contents): void
     {
         $envelope = [
             'subject' => $subject,
@@ -84,7 +84,10 @@ final class ImapConnection implements Connection
 
         $message = imap_mail_compose($envelope, $bodies);
 
-        return imap_append($this->imap, $this->mailbox, $message);
+        $result = imap_append($this->imap, $this->mailbox, $message);
+        if ($result === false) {
+            throw new \RuntimeException('imap_append'); // imap_last_error ?
+        }
     }
 
     public function getUid(string $subject): ?string
@@ -103,9 +106,6 @@ final class ImapConnection implements Connection
 
     public function delete(string $uid): void
     {
-        $result = imap_delete($this->imap, $uid, FT_UID);
-        if ($result === false) {
-            throw new \RuntimeException('Can not delete message with uid: ' . $uid);
-        }
+        imap_delete($this->imap, $uid, FT_UID);
     }
 }

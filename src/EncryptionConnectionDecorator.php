@@ -58,9 +58,9 @@ final class EncryptionConnectionDecorator implements Connection
         return $this->decrypt($this->inner->read($uid));
     }
 
-    public function write(string $subject, string $contents): bool
+    public function write(string $subject, string $contents): void
     {
-        return $this->inner->write($this->encrypt($subject), $this->encrypt($contents));
+        $this->inner->write($this->encrypt($subject), $this->encrypt($contents));
     }
 
     public function delete(string $uid): void

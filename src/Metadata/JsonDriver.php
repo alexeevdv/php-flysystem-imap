@@ -11,9 +11,14 @@ final class JsonDriver implements Driver
         $this->tree = Item::directory('', []);
     }
 
-    public function getItemPath(Item $item): ?string
+    public function getItemPath(Item $item): string
     {
-        return $this->getItemPathInternal($this->getTree(), $item);
+        $path = $this->getItemPathInternal($this->getTree(), $item);
+        if ($path === null) {
+            throw new \RuntimeException('Cant build item path');
+        }
+
+        return $path;
     }
 
     private function getItemPathInternal(Item $tree, Item $needle): ?string

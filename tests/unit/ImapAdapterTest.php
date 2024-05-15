@@ -8,24 +8,34 @@ use alexeevdv\Flysystem\Imap\Metadata\Driver;
 use alexeevdv\Flysystem\Imap\Metadata\Item;
 use alexeevdv\Flysystem\Imap\Metadata\JsonDriver;
 use Codeception\Test\Unit;
+use League\Flysystem\Config;
 use League\Flysystem\UnableToDeleteFile;
 use League\Flysystem\UnableToReadFile;
+use League\Flysystem\UnableToWriteFile;
 use PHPUnit\Framework\MockObject\MockObject;
 
 final class ImapAdapterTest extends Unit
 {
     private ImapAdapter $imapAdapter;
 
-    /**
-     * @var Connection|MockObject
-     */
-    private $connection;
+    private MockObject|Connection $connection;
 
     private Driver $metadataDriver;
 
     protected function _setUp(): void
     {
         $this->metadataDriver = new JsonDriver();
+
+        $this->connection = $this->createMock(Connection::class);
+
+        $this->imapAdapter = new ImapAdapter($this->metadataDriver, $this->connection, 'metadata');
+    }
+
+    /**
+     * @dataProvider fileExistsDataProvider
+     */
+    public function testFileExists(string $path, bool $expected): void
+    {
         $this->metadataDriver->fromString(json_encode([
             [
                 'name' => 'dir1',
@@ -67,16 +77,6 @@ final class ImapAdapterTest extends Unit
             ],
         ], JSON_THROW_ON_ERROR));
 
-        $this->connection = $this->createMock(Connection::class);
-
-        $this->imapAdapter = new ImapAdapter($this->metadataDriver, $this->connection, 'metadata');
-    }
-
-    /**
-     * @dataProvider fileExistsDataProvider
-     */
-    public function testFileExists(string $path, bool $expected): void
-    {
         $actual = $this->imapAdapter->fileExists($path);
 
         self::assertSame($expected, $actual);
@@ -101,6 +101,47 @@ final class ImapAdapterTest extends Unit
      */
     public function testDirectoryExists(string $path, bool $expected): void
     {
+        $this->metadataDriver->fromString(json_encode([
+            [
+                'name' => 'dir1',
+                'isDirectory' => true,
+                'children' => [
+                    [
+                        'name' => 'dir1.1',
+                        'isDirectory' => true,
+                        'children' => [],
+                    ],
+                    [
+                        'name' => 'dir1.2',
+                        'isDirectory' => true,
+                        'children' => [
+                            [
+                                'name' => 'file1.2.1',
+                                'isDirectory' => false,
+                                'children' => [],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            [
+                'name' => 'dir2',
+                'isDirectory' => true,
+                'children' => [],
+            ],
+            [
+                'name' => 'dir3',
+                'isDirectory' => true,
+                'children' => [
+                    [
+                        'name' => 'dir3.1',
+                        'isDirectory' => true,
+                        'children' => [],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR));
+
         $actual = $this->imapAdapter->directoryExists($path);
 
         self::assertSame($expected, $actual);
@@ -295,5 +336,71 @@ final class ImapAdapterTest extends Unit
         ;
 
         $this->imapAdapter->delete('file1');
+    }
+
+    public function testWriteExistingDirectory(): void
+    {
+        $this->metadataDriver->getTree()->addChild(Item::directory('dir1'));
+
+        $this->expectException(UnableToWriteFile::class);
+
+        $this->imapAdapter->write('dir1', '', new Config());
+    }
+
+    public function testWriteExistingItemWithNoUid(): void
+    {
+        $this->metadataDriver->getTree()->addChild(Item::file('file1'));
+
+        $this->expectException(UnableToWriteFile::class);
+
+        $this->imapAdapter->write('file1', '', new Config());
+    }
+
+    public function testWriteExistingItemDeletionFailed(): void
+    {
+        $file1 = Item::file('file1');
+        $file1->setUid('123');
+        $this->metadataDriver->getTree()->addChild($file1);
+
+        $this->connection->expects($this->once())->method('delete')
+            ->with('123')
+            ->willThrowException(new \RuntimeException())
+        ;
+
+        $this->expectException(UnableToWriteFile::class);
+
+        $this->imapAdapter->write('file1', '', new Config());
+    }
+
+    public function testWriteFailed(): void
+    {
+        $this->metadataDriver->getTree();
+
+        $this->connection->expects($this->once())->method('write')
+            ->with('file1', 'contents')
+            ->willThrowException(new \RuntimeException())
+        ;
+
+        $this->expectException(UnableToWriteFile::class);
+
+        $this->imapAdapter->write('file1', 'contents', new Config());
+    }
+
+    public function testWriteGetUidFailed(): void
+    {
+        $this->metadataDriver->getTree();
+
+        $this->connection->expects($this->once())->method('write')
+            ->with('file1', 'contents')
+        ;
+
+        $this->connection->expects($this->once())->method('getUid')
+            ->with('file1')
+            ->willReturn(null)
+        ;
+
+        $this->expectException(UnableToWriteFile::class);
+
+        $this->imapAdapter->write('file1', 'contents', new Config());
     }
 }

@@ -4,7 +4,7 @@ namespace alexeevdv\Flysystem\Imap\Metadata;
 
 interface Driver
 {
-    public function getItemPath(Item $item): ?string;
+    public function getItemPath(Item $item): string;
 
     public function getTree(): Item;
 

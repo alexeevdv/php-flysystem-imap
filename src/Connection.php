@@ -13,7 +13,7 @@ interface Connection
 
     public function read(string $uid): string;
 
-    public function write(string $subject, string $contents): bool;
+    public function write(string $subject, string $contents): void;
 
     public function delete(string $uid): void;
 }
